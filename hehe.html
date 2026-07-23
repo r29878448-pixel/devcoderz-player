@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Direct Shaka Player</title>
+    <title>Dynamic Shaka Player</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
     <style>
         body {
@@ -89,8 +89,6 @@
                     return;
                 }
 
-                const modifiedManifestUri = rawManifestUrl.replace(/\/master\.mpd\?/, '/dash/audio/6.mp4?');
-
                 const video = document.getElementById('videoPlayer');
                 const player = new shaka.Player(video);
 
@@ -107,7 +105,7 @@
                     }
                 });
 
-                await player.load(modifiedManifestUri);
+                await player.load(rawManifestUrl);
                 console.log('Video loaded successfully!');
             } catch (e) {
                 showError(`Failed to load: ${e.message}`);
