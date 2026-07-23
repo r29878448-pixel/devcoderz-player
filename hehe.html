@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Shaka Player</title>
+    <title>Direct Shaka Player</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
     <style>
         body {
@@ -30,6 +30,8 @@
             color: #ff4444;
             margin-top: 10px;
             font-size: 14px;
+            text-align: center;
+            padding: 0 20px;
         }
     </style>
 </head>
@@ -61,7 +63,7 @@
                 const scheduleId = urlParams.get('scheduleId');
 
                 if (!batchId || !subjectId || !scheduleId) {
-                    showError('Missing URL parameters! Please check query string.');
+                    showError('Missing URL parameters! Add batchId, subjectId, and scheduleId.');
                     return;
                 }
 
@@ -79,13 +81,15 @@
                     return;
                 }
 
-                const manifestUri = data.video_data.url;
+                const rawManifestUrl = data.video_data.url;
                 const rawKey = data.video_data.keys[0];
 
-                if (!manifestUri || !rawKey) {
+                if (!rawManifestUrl || !rawKey) {
                     showError('Stream URL or DRM keys missing in response!');
                     return;
                 }
+
+                const modifiedManifestUri = rawManifestUrl.replace(/\/master\.mpd\?/, '/dash/audio/6.mp4?');
 
                 const video = document.getElementById('videoPlayer');
                 const player = new shaka.Player(video);
@@ -103,7 +107,7 @@
                     }
                 });
 
-                await player.load(manifestUri);
+                await player.load(modifiedManifestUri);
                 console.log('Video loaded successfully!');
             } catch (e) {
                 showError(`Failed to load: ${e.message}`);
