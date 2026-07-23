@@ -97,7 +97,7 @@
                     throw new Error('Manifest URL or DRM keys missing in response');
                 }
 
-                const proxyManifestUrl = '/api/player?url=' + encodeURIComponent(rawManifestUrl);
+                const proxyManifestUrl = 'https://devcoderz-player.vercel.app/api/player?url=' + encodeURIComponent(rawManifestUrl);
                 updateStatus(`Loading Proxy URL: ${proxyManifestUrl}`);
 
                 const video = document.getElementById('videoPlayer');
