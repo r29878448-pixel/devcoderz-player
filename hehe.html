@@ -84,7 +84,7 @@
                     throw new Error('Invalid API response structure');
                 }
 
-                const rawManifestUrl = data.video_data.url;
+                let rawManifestUrl = data.video_data.url.replace('https://streamvideo.co.in/play/', '');
                 const rawKey = data.video_data.keys && data.video_data.keys[0];
 
                 if (!rawManifestUrl || !rawKey) {
