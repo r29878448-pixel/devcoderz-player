@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Shaka Player</title>
+    <title>Detailed Shaka Player Debugger</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
     <style>
         body {
@@ -26,77 +26,99 @@
             height: auto;
             display: block;
         }
-        #error-msg {
-            color: #ff4444;
-            margin-top: 10px;
+        #status-box {
+            color: #00ffcc;
+            margin-top: 15px;
             font-size: 14px;
             text-align: center;
             padding: 0 20px;
+            max-width: 800px;
+            word-break: break-all;
         }
     </style>
 </head>
 <body>
     <div class="video-container">
         <video id="videoPlayer" controls autoplay></video>
-        <div id="error-msg"></div>
+        <div id="status-box">Initializing player system...</div>
     </div>
 
     <script>
-        const errorBox = document.getElementById('error-msg');
+        const statusBox = document.getElementById('status-box');
 
-        function showError(msg) {
-            console.error(msg);
-            errorBox.innerText = msg;
+        function updateStatus(message, isError = false) {
+            console.log(message);
+            statusBox.style.color = isError ? '#ff4444' : '#00ffcc';
+            statusBox.innerText = message;
         }
 
         async function initApp() {
             try {
+                updateStatus('Step 1: Installing Shaka polyfills...');
                 shaka.polyfill.installAll();
+
                 if (!shaka.Player.isBrowserSupported()) {
-                    showError('Browser not supported!');
+                    updateStatus('Error: Browser is not supported by Shaka Player!', true);
                     return;
                 }
 
+                updateStatus('Step 2: Reading URL parameters...');
                 const urlParams = new URLSearchParams(window.location.search);
                 const batchId = urlParams.get('batchId');
                 const subjectId = urlParams.get('subjectId');
                 const scheduleId = urlParams.get('scheduleId');
 
                 if (!batchId || !subjectId || !scheduleId) {
-                    showError('Missing URL parameters! Add batchId, subjectId, and scheduleId.');
+                    updateStatus(`Error: Missing parameters! Received -> batchId: ${batchId}, subjectId: ${subjectId}, scheduleId: ${scheduleId}`, true);
                     return;
                 }
 
+                updateStatus('Step 3: Building API URL and fetching data...');
                 const timestamp = new Date().getTime();
                 const apiUrl = `https://brainboxinstitute.in/api/video-url?batchId=${batchId}&subjectId=${subjectId}&scheduleId=${scheduleId}&t=${timestamp}`;
 
                 const response = await fetch(apiUrl);
                 if (!response.ok) {
-                    throw new Error(`API HTTP error! Status: ${response.status}`);
+                    throw new Error(`API Fetch Failed! HTTP Status: ${response.status} (${response.statusText})`);
                 }
 
                 const data = await response.json();
-                if (!data.success || !data.video_data) {
-                    showError('Invalid API response data!');
-                    return;
+                updateStatus('Step 4: API Response received successfully. Validating data structure...');
+
+                if (!data.success) {
+                    throw new Error('API returned success: false. The request might be unauthorized or expired.');
+                }
+
+                if (!data.video_data) {
+                    throw new Error('API response does not contain "video_data" object.');
                 }
 
                 const rawManifestUrl = data.video_data.url;
-                const rawKey = data.video_data.keys[0];
+                const rawKey = data.video_data.keys && data.video_data.keys[0];
 
-                if (!rawManifestUrl || !rawKey) {
-                    showError('Stream URL or DRM keys missing in response!');
-                    return;
+                if (!rawManifestUrl) {
+                    throw new Error('Video manifest URL is missing inside video_data.');
                 }
 
+                if (!rawKey) {
+                    throw new Error('DRM keys array is empty or missing inside video_data.');
+                }
+
+                updateStatus('Step 5: Setting up Shaka Player instance and DRM configuration...');
                 const video = document.getElementById('videoPlayer');
                 const player = new shaka.Player(video);
 
                 player.addEventListener('error', (event) => {
-                    showError(`Shaka Player Error: Code ${event.detail.code}`);
+                    const errCode = event.detail ? event.detail.code : 'Unknown Code';
+                    const errCategory = event.detail ? event.detail.category : 'Unknown Category';
+                    updateStatus(`Shaka Player Error Triggered! Code: ${errCode}, Category: ${errCategory}`, true);
                 });
 
                 const [keyId, key] = rawKey.split(':');
+                if (!keyId || !key) {
+                    throw new Error(`Invalid DRM key format received: "${rawKey}"`);
+                }
+
                 player.configure({
                     drm: {
                         clearKeys: {
@@ -105,10 +127,12 @@
                     }
                 });
 
+                updateStatus('Step 6: Loading video manifest into player...');
                 await player.load(rawManifestUrl);
-                console.log('Video loaded successfully!');
+                updateStatus('Success: Video is loaded and playing successfully!');
+
             } catch (e) {
-                showError(`Failed to load: ${e.message}`);
+                updateStatus(`Critical Error Caught: ${e.message || e}`, true);
             }
         }
 
