@@ -7,7 +7,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get('/api/player', async (req, res) => {
+app.get('/hehe.html', async (req, res) => {
     const targetUrl = req.query.url;
 
     if (!targetUrl) {
