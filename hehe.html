@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Shaka Player</title>
+    <title>Dynamic Shaka Player with Proxy</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
     <style>
         body {
@@ -84,14 +84,21 @@
                     throw new Error('Invalid API response structure');
                 }
 
-                let rawManifestUrl = data.video_data.url.replace('https://streamvideo.co.in/play/', '');
+                let rawManifestUrl = data.video_data.url;
+                if (rawManifestUrl.startsWith('//')) {
+                    rawManifestUrl = 'https:' + rawManifestUrl;
+                } else if (!rawManifestUrl.startsWith('http://') && !rawManifestUrl.startsWith('https://')) {
+                    rawManifestUrl = 'https://' + rawManifestUrl;
+                }
+
                 const rawKey = data.video_data.keys && data.video_data.keys[0];
 
                 if (!rawManifestUrl || !rawKey) {
                     throw new Error('Manifest URL or DRM keys missing in response');
                 }
 
-                updateStatus(`Loading URL: ${rawManifestUrl}`);
+                const proxyManifestUrl = '/api/player?url=' + encodeURIComponent(rawManifestUrl);
+                updateStatus(`Loading Proxy URL: ${proxyManifestUrl}`);
 
                 const video = document.getElementById('videoPlayer');
                 const player = new shaka.Player(video);
@@ -113,7 +120,7 @@
                     }
                 });
 
-                await player.load(rawManifestUrl);
+                await player.load(proxyManifestUrl);
                 updateStatus('Success: Video loaded and playing successfully!');
             } catch (e) {
                 const errorMsg = (e && e.message) ? e.message : JSON.stringify(e);
