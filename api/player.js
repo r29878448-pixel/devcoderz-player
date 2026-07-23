@@ -7,16 +7,10 @@ export default async function handler(req, res) {
     }
 
     try {
-        const urlObj = new URL(targetUrl);
-        const response = await fetch(targetUrl, {
-            headers: {
-                'Host': urlObj.host,
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Accept': '*/*',
-                'Origin': 'https://brainboxinstitute.in',
-                'Referer': 'https://brainboxinstitute.in/'
-            }
-        });
+        const scrapeDoToken = '11c63f21b40043bbbe24ee1c179b1b3ede58155df6a';
+        const scrapeUrl = `https://api.scrape.do?token=${scrapeDoToken}&url=${encodeURIComponent(targetUrl)}`;
+
+        const response = await fetch(scrapeUrl);
 
         const contentType = response.headers.get('content-type') || 'application/octet-stream';
         const buffer = await response.arrayBuffer();
