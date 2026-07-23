@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Detailed Shaka Player Debugger</title>
+    <title>Dynamic Shaka Player</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
     <style>
         body {
@@ -40,7 +40,7 @@
 <body>
     <div class="video-container">
         <video id="videoPlayer" controls autoplay></video>
-        <div id="status-box">Initializing player system...</div>
+        <div id="status-box">Initializing player...</div>
     </div>
 
     <script>
@@ -54,71 +54,62 @@
 
         async function initApp() {
             try {
-                updateStatus('Step 1: Installing Shaka polyfills...');
                 shaka.polyfill.installAll();
-
                 if (!shaka.Player.isBrowserSupported()) {
-                    updateStatus('Error: Browser is not supported by Shaka Player!', true);
+                    updateStatus('Error: Browser not supported!', true);
                     return;
                 }
 
-                updateStatus('Step 2: Reading URL parameters...');
                 const urlParams = new URLSearchParams(window.location.search);
                 const batchId = urlParams.get('batchId');
                 const subjectId = urlParams.get('subjectId');
                 const scheduleId = urlParams.get('scheduleId');
 
                 if (!batchId || !subjectId || !scheduleId) {
-                    updateStatus(`Error: Missing parameters! Received -> batchId: ${batchId}, subjectId: ${subjectId}, scheduleId: ${scheduleId}`, true);
+                    updateStatus('Error: Missing URL parameters (batchId, subjectId, scheduleId)', true);
                     return;
                 }
 
-                updateStatus('Step 3: Building API URL and fetching data...');
+                updateStatus('Fetching video details from API...');
                 const timestamp = new Date().getTime();
                 const apiUrl = `https://brainboxinstitute.in/api/video-url?batchId=${batchId}&subjectId=${subjectId}&scheduleId=${scheduleId}&t=${timestamp}`;
 
                 const response = await fetch(apiUrl);
                 if (!response.ok) {
-                    throw new Error(`API Fetch Failed! HTTP Status: ${response.status} (${response.statusText})`);
+                    throw new Error(`API HTTP Error: ${response.status}`);
                 }
 
                 const data = await response.json();
-                updateStatus('Step 4: API Response received successfully. Validating data structure...');
-
-                if (!data.success) {
-                    throw new Error('API returned success: false. The request might be unauthorized or expired.');
-                }
-
-                if (!data.video_data) {
-                    throw new Error('API response does not contain "video_data" object.');
+                if (!data.success || !data.video_data) {
+                    throw new Error('Invalid API response structure');
                 }
 
                 const rawManifestUrl = data.video_data.url;
                 const rawKey = data.video_data.keys && data.video_data.keys[0];
 
-                if (!rawManifestUrl) {
-                    throw new Error('Video manifest URL is missing inside video_data.');
+                if (!rawManifestUrl || !rawKey) {
+                    throw new Error('Manifest URL or DRM keys missing');
                 }
 
-                if (!rawKey) {
-                    throw new Error('DRM keys array is empty or missing inside video_data.');
+                // URL ko aapke bataye hue custom format me convert karna
+                let finalManifestUri = rawManifestUrl;
+                const match = rawManifestUrl.match(/\.net\/([^/]+)\/master\.mpd/);
+                if (match && match[1]) {
+                    const fileHash = match[1];
+                    const queryParams = rawManifestUrl.split('?')[1];
+                    finalManifestUri = `https://hls.brainboxinstitute.in/play/${fileHash}/dash/audio/6.mp4?${queryParams}`;
                 }
 
-                updateStatus('Step 5: Setting up Shaka Player instance and DRM configuration...');
+                updateStatus(`Transformed URL: ${finalManifestUri}`);
+
                 const video = document.getElementById('videoPlayer');
                 const player = new shaka.Player(video);
 
                 player.addEventListener('error', (event) => {
-                    const errCode = event.detail ? event.detail.code : 'Unknown Code';
-                    const errCategory = event.detail ? event.detail.category : 'Unknown Category';
-                    updateStatus(`Shaka Player Error Triggered! Code: ${errCode}, Category: ${errCategory}`, true);
+                    updateStatus(`Shaka Error Code: ${event.detail.code}, Category: ${event.detail.category}`, true);
                 });
 
                 const [keyId, key] = rawKey.split(':');
-                if (!keyId || !key) {
-                    throw new Error(`Invalid DRM key format received: "${rawKey}"`);
-                }
-
                 player.configure({
                     drm: {
                         clearKeys: {
@@ -127,12 +118,10 @@
                     }
                 });
 
-                updateStatus('Step 6: Loading video manifest into player...');
-                await player.load(rawManifestUrl);
-                updateStatus('Success: Video is loaded and playing successfully!');
-
+                await player.load(finalManifestUri);
+                updateStatus('Success: Video loaded and playing!');
             } catch (e) {
-                updateStatus(`Critical Error Caught: ${e.message || e}`, true);
+                updateStatus(`Critical Error: ${e.message}`, true);
             }
         }
 
