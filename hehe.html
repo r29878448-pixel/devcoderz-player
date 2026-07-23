@@ -9,10 +9,13 @@
         body {
             margin: 0;
             background: #000;
+            color: #fff;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
+            font-family: Arial, sans-serif;
         }
         .video-container {
             width: 100%;
@@ -23,51 +26,72 @@
             height: auto;
             display: block;
         }
+        #error-msg {
+            color: #ff4444;
+            margin-top: 10px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
     <div class="video-container">
         <video id="videoPlayer" controls autoplay></video>
+        <div id="error-msg"></div>
     </div>
 
     <script>
+        const errorBox = document.getElementById('error-msg');
+
+        function showError(msg) {
+            console.error(msg);
+            errorBox.innerText = msg;
+        }
+
         async function initApp() {
-            shaka.polyfill.installAll();
-            if (!shaka.Player.isBrowserSupported()) {
-                console.error('Browser not supported!');
-                return;
-            }
-
-            const urlParams = new URLSearchParams(window.location.search);
-            const batchId = urlParams.get('batchId');
-            const subjectId = urlParams.get('subjectId');
-            const scheduleId = urlParams.get('scheduleId');
-
-            if (!batchId || !subjectId || !scheduleId) {
-                console.error('Missing URL parameters!');
-                return;
-            }
-
-            const timestamp = new Date().getTime();
-            const apiUrl = `https://brainboxinstitute.in/api/video-url?batchId=${batchId}&subjectId=${subjectId}&scheduleId=${scheduleId}&t=${timestamp}`;
-
             try {
-                const response = await fetch(apiUrl);
-                const data = await response.json();
+                shaka.polyfill.installAll();
+                if (!shaka.Player.isBrowserSupported()) {
+                    showError('Browser not supported!');
+                    return;
+                }
 
+                const urlParams = new URLSearchParams(window.location.search);
+                const batchId = urlParams.get('batchId');
+                const subjectId = urlParams.get('subjectId');
+                const scheduleId = urlParams.get('scheduleId');
+
+                if (!batchId || !subjectId || !scheduleId) {
+                    showError('Missing URL parameters! Please check query string.');
+                    return;
+                }
+
+                const timestamp = new Date().getTime();
+                const apiUrl = `https://brainboxinstitute.in/api/video-url?batchId=${batchId}&subjectId=${subjectId}&scheduleId=${scheduleId}&t=${timestamp}`;
+
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`API HTTP error! Status: ${response.status}`);
+                }
+
+                const data = await response.json();
                 if (!data.success || !data.video_data) {
-                    console.error('Invalid API response');
+                    showError('Invalid API response data!');
                     return;
                 }
 
                 const manifestUri = data.video_data.url;
                 const rawKey = data.video_data.keys[0];
 
+                if (!manifestUri || !rawKey) {
+                    showError('Stream URL or DRM keys missing in response!');
+                    return;
+                }
+
                 const video = document.getElementById('videoPlayer');
                 const player = new shaka.Player(video);
 
                 player.addEventListener('error', (event) => {
-                    console.error('Error code', event.detail.code, event.detail);
+                    showError(`Shaka Player Error: Code ${event.detail.code}`);
                 });
 
                 const [keyId, key] = rawKey.split(':');
@@ -82,7 +106,7 @@
                 await player.load(manifestUri);
                 console.log('Video loaded successfully!');
             } catch (e) {
-                console.error('Error loading video data', e);
+                showError(`Failed to load: ${e.message}`);
             }
         }
 
