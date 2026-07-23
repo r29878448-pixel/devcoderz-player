@@ -92,7 +92,7 @@
                 }
 
                 let targetManifestUri = rawManifestUrl.replace('https://streamvideo.co.in/play/', 'https://hls.brainboxinstitute.in/play/');
-                let finalManifestUri = `/api/player?url=${encodeURIComponent(targetManifestUri)}`;
+                let finalManifestUri = `https://devcoderz-player.vercel.app/api/player?url=${encodeURIComponent(targetManifestUri)}`;
 
                 updateStatus(`Proxy URL: ${finalManifestUri}`);
 
