@@ -1,60 +1,92 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/shaka-player.compiled.js"></script>
-  <style>
-    body { margin: 0; background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
-    #player-container { width: 90%; max-width: 800px; }
-    #status-bar { padding: 15px; background: #1a1a1a; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #0af; }
-    video { width: 100%; border-radius: 8px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Shaka Player</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .video-container {
+            width: 100%;
+            max-width: 900px;
+        }
+        video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+    </style>
 </head>
 <body>
+    <div class="video-container">
+        <video id="videoPlayer" controls autoplay></video>
+    </div>
 
-<div id="player-container">
-  <div id="status-bar">Initializing...</div>
-  <video id="video" controls autoplay></video>
-</div>
+    <script>
+        async function initApp() {
+            shaka.polyfill.installAll();
+            if (!shaka.Player.isBrowserSupported()) {
+                console.error('Browser not supported!');
+                return;
+            }
 
-<script>
-  const status = document.getElementById('status-bar');
-  const video = document.getElementById('video');
+            const urlParams = new URLSearchParams(window.location.search);
+            const batchId = urlParams.get('batchId');
+            const subjectId = urlParams.get('subjectId');
+            const scheduleId = urlParams.get('scheduleId');
 
-  function log(msg) { status.innerText = msg; }
+            if (!batchId || !subjectId || !scheduleId) {
+                console.error('Missing URL parameters!');
+                return;
+            }
 
-  async function initPlayer() {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      log("Fetching video info...");
-      
-      const res = await fetch(`https://devcoderz-api.vercel.app/api/video?${params.toString()}`);
-      const data = await res.json();
-      
-      log("URL mila: " + data.manifestUrl.substring(0, 15) + "...");
-      
-      const player = new shaka.Player(video);
+            const timestamp = new Date().getTime();
+            const apiUrl = `https://brainboxinstitute.in/api/video-url?batchId=${batchId}&subjectId=${subjectId}&scheduleId=${scheduleId}&t=${timestamp}`;
 
-      // Sabse important part: Headers ko spoof karna
-      player.getNetworkingEngine().registerRequestFilter((type, request) => {
-        request.headers['Referer'] = 'https://cloudfront.testwave.cc/';
-        request.headers['Origin'] = 'https://cloudfront.testwave.cc';
-        request.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-      });
+            try {
+                const response = await fetch(apiUrl);
+                const data = await response.json();
 
-      player.configure({
-        drm: { clearKeys: data.clearKeys }
-      });
+                if (!data.success || !data.video_data) {
+                    console.error('Invalid API response');
+                    return;
+                }
 
-      log("Key fetch aur Player load ho raha hai...");
-      await player.load(data.manifestUrl);
-      log("Player loaded successfully!");
-    } catch (e) {
-      log("Error: " + e.message);
-    }
-  }
+                const manifestUri = data.video_data.url;
+                const rawKey = data.video_data.keys[0];
 
-  initPlayer();
-</script>
+                const video = document.getElementById('videoPlayer');
+                const player = new shaka.Player(video);
+
+                player.addEventListener('error', (event) => {
+                    console.error('Error code', event.detail.code, event.detail);
+                });
+
+                const [keyId, key] = rawKey.split(':');
+                player.configure({
+                    drm: {
+                        clearKeys: {
+                            [keyId]: key
+                        }
+                    }
+                });
+
+                await player.load(manifestUri);
+                console.log('Video loaded successfully!');
+            } catch (e) {
+                console.error('Error loading video data', e);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
 </body>
 </html>
