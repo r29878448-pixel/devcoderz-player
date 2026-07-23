@@ -91,13 +91,16 @@
                     throw new Error('Manifest URL or DRM keys missing in response');
                 }
 
-                // URL Transformation: https://streamvideo.co.in/play/ -> https://hls.brainboxinstitute.in/play/
-                let finalManifestUri = rawManifestUrl.replace('https://streamvideo.co.in/play/', 'https://hls.brainboxinstitute.in/play/');
-
-                updateStatus(`Final URL: ${finalManifestUri}`);
-
                 const video = document.getElementById('videoPlayer');
                 const player = new shaka.Player(video);
+
+                player.getNetworkingEngine().registerRequestFilter(function(type, request) {
+                    if (type === shaka.net.NetworkingEngine.RequestType.MANIFEST || 
+                        type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
+                        request.headers['Referer'] = 'https://brainboxinstitute.in/';
+                        request.headers['Origin'] = 'https://brainboxinstitute.in';
+                    }
+                });
 
                 player.addEventListener('error', (event) => {
                     const errDetail = event.detail;
@@ -115,7 +118,7 @@
                     }
                 });
 
-                await player.load(finalManifestUri);
+                await player.load(rawManifestUrl);
                 updateStatus('Success: Video loaded and playing successfully!');
             } catch (e) {
                 const errorMsg = (e && e.message) ? e.message : JSON.stringify(e);
