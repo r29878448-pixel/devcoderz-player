@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Shaka Player</title>
+    <title>Dynamic Shaka Player with Proxy</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
     <style>
         body {
@@ -91,26 +91,20 @@
                     throw new Error('Manifest URL or DRM keys missing in response');
                 }
 
-                let finalManifestUri = rawManifestUrl.replace('https://streamvideo.co.in/play/', 'https://hls.brainboxinstitute.in/play/');
+                let targetManifestUri = rawManifestUrl.replace('https://streamvideo.co.in/play/', 'https://hls.brainboxinstitute.in/play/');
+                let finalManifestUri = `/api/player?url=${encodeURIComponent(targetManifestUri)}`;
 
-                updateStatus(`Final URL: ${finalManifestUri}`);
+                updateStatus(`Proxy URL: ${finalManifestUri}`);
 
                 const video = document.getElementById('videoPlayer');
                 const player = new shaka.Player(video);
-
-                player.getNetworkingEngine().registerRequestFilter(function(type, request) {
-                    if (type === shaka.net.NetworkingEngine.RequestType.MANIFEST || 
-                        type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
-                        request.headers['Referer'] = 'https://brainboxinstitute.in/';
-                        request.headers['Origin'] = 'https://brainboxinstitute.in';
-                    }
-                });
 
                 player.addEventListener('error', (event) => {
                     const errDetail = event.detail;
                     const errCode = errDetail ? errDetail.code : 'Unknown';
                     const errCategory = errDetail ? errDetail.category : 'Unknown';
-                    updateStatus(`Shaka Player Error -> Code: ${errCode}, Category: ${errCategory}`, true);
+                    const errData = errDetail && errDetail.data ? JSON.stringify(errDetail.data) : '';
+                    updateStatus(`Shaka Player Error -> Code: ${errCode}, Category: ${errCategory} | Data: ${errData}`, true);
                 });
 
                 const [keyId, key] = rawKey.split(':');
