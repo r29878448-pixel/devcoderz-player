@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Shaka Player with Proxy</title>
+    <title>Dynamic Shaka Player</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
     <style>
         body {
@@ -91,10 +91,7 @@
                     throw new Error('Manifest URL or DRM keys missing in response');
                 }
 
-                let targetManifestUri = rawManifestUrl.replace('https://streamvideo.co.in/play/', 'https://hls.brainboxinstitute.in/play/');
-                let finalManifestUri = `https://devcoderz-player.vercel.app/api/player?url=${encodeURIComponent(targetManifestUri)}`;
-
-                updateStatus(`Proxy URL: ${finalManifestUri}`);
+                updateStatus(`Loading URL: ${rawManifestUrl}`);
 
                 const video = document.getElementById('videoPlayer');
                 const player = new shaka.Player(video);
@@ -116,7 +113,7 @@
                     }
                 });
 
-                await player.load(finalManifestUri);
+                await player.load(rawManifestUrl);
                 updateStatus('Success: Video loaded and playing successfully!');
             } catch (e) {
                 const errorMsg = (e && e.message) ? e.message : JSON.stringify(e);
