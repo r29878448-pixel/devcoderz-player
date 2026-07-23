@@ -1,16 +1,8 @@
-import express from 'express';
-import cors from 'cors';
-import fetch from 'node-fetch';
-
-const app = express();
-
-app.use(cors());
-app.use(express.json());
-
-app.get('/hehe.html', async (req, res) => {
+export default async function handler(req, res) {
     const targetUrl = req.query.url;
 
     if (!targetUrl) {
+        res.setHeader('Access-Control-Allow-Origin', '*');
         return res.status(400).json({ error: 'URL parameter is required' });
     }
 
@@ -23,26 +15,15 @@ app.get('/hehe.html', async (req, res) => {
             }
         });
 
-        if (!response.ok) {
-            return res.status(response.status).json({ 
-                error: `Upstream error: ${response.status}`, 
-                statusText: response.statusText 
-            });
-        }
-
         const contentType = response.headers.get('content-type') || 'application/octet-stream';
         const buffer = await response.arrayBuffer();
 
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Content-Type', contentType);
-        return res.status(200).send(Buffer.from(buffer));
+        return res.status(response.status).send(Buffer.from(buffer));
 
     } catch (err) {
+        res.setHeader('Access-Control-Allow-Origin', '*');
         return res.status(500).json({ error: err.message });
     }
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Proxy server running on port ${PORT}`);
-});
+}
