@@ -29,7 +29,7 @@
         #status-box {
             color: #00ffcc;
             margin-top: 15px;
-            font-size: 14px;
+            font-size: 13px;
             text-align: center;
             padding: 0 20px;
             max-width: 800px;
@@ -76,7 +76,7 @@
 
                 const response = await fetch(apiUrl);
                 if (!response.ok) {
-                    throw new Error(`API HTTP Error: ${response.status}`);
+                    throw new Error(`API HTTP Error Status: ${response.status}`);
                 }
 
                 const data = await response.json();
@@ -88,25 +88,22 @@
                 const rawKey = data.video_data.keys && data.video_data.keys[0];
 
                 if (!rawManifestUrl || !rawKey) {
-                    throw new Error('Manifest URL or DRM keys missing');
+                    throw new Error('Manifest URL or DRM keys missing in response');
                 }
 
-                // URL ko aapke bataye hue custom format me convert karna
-                let finalManifestUri = rawManifestUrl;
-                const match = rawManifestUrl.match(/\.net\/([^/]+)\/master\.mpd/);
-                if (match && match[1]) {
-                    const fileHash = match[1];
-                    const queryParams = rawManifestUrl.split('?')[1];
-                    finalManifestUri = `https://hls.brainboxinstitute.in/play/${fileHash}/dash/audio/6.mp4?${queryParams}`;
-                }
+                // URL Transformation: https://streamvideo.co.in/play/ -> https://hls.brainboxinstitute.in/play/
+                let finalManifestUri = rawManifestUrl.replace('https://streamvideo.co.in/play/', 'https://hls.brainboxinstitute.in/play/');
 
-                updateStatus(`Transformed URL: ${finalManifestUri}`);
+                updateStatus(`Final URL: ${finalManifestUri}`);
 
                 const video = document.getElementById('videoPlayer');
                 const player = new shaka.Player(video);
 
                 player.addEventListener('error', (event) => {
-                    updateStatus(`Shaka Error Code: ${event.detail.code}, Category: ${event.detail.category}`, true);
+                    const errDetail = event.detail;
+                    const errCode = errDetail ? errDetail.code : 'Unknown';
+                    const errCategory = errDetail ? errDetail.category : 'Unknown';
+                    updateStatus(`Shaka Player Error -> Code: ${errCode}, Category: ${errCategory}`, true);
                 });
 
                 const [keyId, key] = rawKey.split(':');
@@ -119,9 +116,10 @@
                 });
 
                 await player.load(finalManifestUri);
-                updateStatus('Success: Video loaded and playing!');
+                updateStatus('Success: Video loaded and playing successfully!');
             } catch (e) {
-                updateStatus(`Critical Error: ${e.message}`, true);
+                const errorMsg = (e && e.message) ? e.message : JSON.stringify(e);
+                updateStatus(`Critical Error: ${errorMsg}`, true);
             }
         }
 
