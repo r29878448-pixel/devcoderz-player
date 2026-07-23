@@ -7,11 +7,14 @@ export default async function handler(req, res) {
     }
 
     try {
+        const urlObj = new URL(targetUrl);
         const response = await fetch(targetUrl, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Referer': 'https://brainboxinstitute.in/',
-                'Origin': 'https://brainboxinstitute.in'
+                'Host': urlObj.host,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': '*/*',
+                'Origin': 'https://brainboxinstitute.in',
+                'Referer': 'https://brainboxinstitute.in/'
             }
         });
 
