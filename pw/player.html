@@ -66,24 +66,30 @@ video{width:100%;height:100%;object-fit:contain}
 let video=document.getElementById("video"),playerDiv=document.getElementById("player"),statusDiv=document.getElementById("status"),shakaPlayer,hideTimer,isDragging=false;
 video.preservesPitch=true;
 shakaPlayer=new shaka.Player(video);
-shakaPlayer.configure({streaming:{rebufferingGoal:2,bufferBehind:30,alwaysStreamAllChannels:true},drm:{retryParameters:{maxAttempts:2}}});
+shakaPlayer.configure({
+ streaming:{rebufferingGoal:2,bufferBehind:30,alwaysStreamAllChannels:true},
+ drm:{retryParameters:{maxAttempts:2}}
+});
 
 async function init(){
  statusDiv.textContent="Fetching...";
  const p=new URLSearchParams(location.search);
  const res=await fetch(`https://api.pimaxer.in/v1/videos/video-url-details?parentId=${p.get('batch_id')}&childId=${p.get('lecture_id')}`);
  const data=await res.json();
-
+ 
  const masterUrl=data.data.url;
  const drmData=data.data.drmDetails.data; // format: "keyId:keyValue"
  const [kidHex, keyHex]=drmData.split(":");
 
- const kidBytes=shaka.util.Uint8Utils.fromHex(kidHex);
- const keyBytes=shaka.util.Uint8Utils.fromHex(keyHex);
- const kidBase64=shaka.util.Uint8Utils.toBase64(kidBytes);
- const keyBase64=shaka.util.Uint8Utils.toBase64(keyBytes);
+ // Direct hex mapping without base64 conversion for robust ClearKey support
+ const clearKeysObj = {};
+ clearKeysObj[kidHex.trim()] = keyHex.trim();
 
- shakaPlayer.configure({drm:{clearKeys:{[kidBase64]:keyBase64}}});
+ shakaPlayer.configure({
+  drm:{
+   clearKeys: clearKeysObj
+  }
+ });
 
  statusDiv.textContent="Loading...";
  await shakaPlayer.load(masterUrl);
