@@ -74,9 +74,9 @@ shakaPlayer.configure({
 async function init(){
  statusDiv.textContent="Fetching...";
  const p=new URLSearchParams(location.search);
- const res=await fetch(`https://api.pimaxer.in/v1/videos/video-url-details?parentId=${p.get('batch_id')}&childId=${p.get('lecture_id')}`);
+ const res=await fetch(`https://api.pimaxer.in/v1/videos/video-url-details?parentId=${p.get('batchId')}&childId=${p.get('lectureId')}`);
  const data=await res.json();
- 
+
  const masterUrl=data.data.url;
  const drmData=data.data.drmDetails.data; // format: "keyId:keyValue"
  const [kidHex, keyHex]=drmData.split(":");
