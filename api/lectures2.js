@@ -1,45 +1,49 @@
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', '*');
+  res.setHeader('Access-Control-Allow-Origin', 'https://Thedevcoderz-pw.pages.dev');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, x-api-key');
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
-  const { id } = req.query;
-  if (!id) return res.status(400).json({ success: false, message: "ID missing" });
+  const userApiKey = req.headers['x-api-key'] || req.query.key;
+  const SECRET_API_KEY = "Darz_ka_baap_devcoderz";
 
-  const url = `https://thestudyspark.site/api-server/v2/videos/get-info?id=${id}`;
+  if (!userApiKey || userApiKey !== SECRET_API_KEY) {
+    return res.status(401).json({ success: false, error: "Hatt bsdk 🖕😂" });
+  }
+
+  const { batchId, subjectId, topicId, contentType, page, tag } = req.query;
+
+  if (!batchId || !subjectId) {
+    return res.status(400).json({ error: "Missing required parameters ❌" });
+  }
+
+  const targetUrl = `https://thestudyspark.site/api-server/v2/batches/${batchId}/subject/${subjectId}/content?page=${page || 1}&contentType=${contentType || ''}&tag=${tag || ''}`;
 
   try {
-    const response = await fetch(url, {
-      method: 'GET',
+    const response = await fetch(targetUrl, {
       headers: {
-        'Referer': 'https://thestudyspark.site/',
-        'Origin': 'https://thestudyspark.site',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Sec-Fetch-Site': 'same-origin',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Dest': 'empty',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Referer": "https://pw.live/",
+        "Accept": "application/json"
       }
     });
 
+    if (response.status === 429) {
+      return res.status(429).json({ error: "Rate limit exceeded ⚠️" });
+    }
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `External API responded with status ${response.status} 💀` });
+    }
+
     const data = await response.json();
-    
-    // Agar key ya decryption data aa raha hai to yahan print hoga
-    console.log("API Response:", JSON.stringify(data, null, 2));
+    return res.status(200).json(data);
 
-    res.status(200).json(data);
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ 
-      success: false, 
-      message: "Proxy failed", 
-      error: err.message 
-    });
+  } catch (e) {
+    return res.status(500).json({ error: "Internal Server Error 💀", details: e.message });
   }
 }
