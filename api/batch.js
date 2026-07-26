@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   const SECRET_API_KEY = "Darz_ka_baap_devcoderz";
 
   if (!userApiKey || userApiKey !== SECRET_API_KEY) {
-    return res.status(401).json({ success: false, error: "Me tumhara baap hu is chij me 😂😂😂 API Key kidhar hai?!" });
+    return res.status(401).json({ success: false, error: "Me tumhara baap hu is chij me 😂😂😂 ye ab kisi aur ke sath krna?!" });
   }
 
   const { batch_id } = req.query;
