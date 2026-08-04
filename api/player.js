@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        let targetUrl = `https://studyuk.online/newproxy/proxy2.php?get_hls=${get_hls || '1'}&quality=${quality || '480'}&mpd=${encodeURIComponent(mpd)}`;
+        let targetUrl = `https://adi-rust.vercel.app/api/proxy2?get_hls=${get_hls || '1'}&quality=${quality || '480'}&mpd=${encodeURIComponent(mpd)}`;
         const response = await fetch(targetUrl);
         
         const contentType = response.headers.get('content-type');
