@@ -7,14 +7,14 @@ export default async function handler(req, res) {
         return res.status(200).end();
     }
 
-    const { batchId, subjectId, childId } = req.query;
+    const { batchId, childId } = req.query;
 
-    if (!batchId || !subjectId || !childId) {
+    if (!batchId  || !childId) {
         return res.status(400).json({ error: 'Missing required parameters' });
     }
 
     try {
-        const targetUrl = `https://flat-moon-3350.bhanuyadav.workers.dev/?batchId=${batchId}&subjectId=${subjectId}&childId=${childId}`;
+        const targetUrl = `https://flat-moon-3350.bhanuyadav.workers.dev/?batchId=${batchId}&childId=${childId}`;
         const response = await fetch(targetUrl);
         const data = await response.json();
         return res.status(200).json(data);
