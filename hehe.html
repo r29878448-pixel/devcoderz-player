@@ -33,18 +33,17 @@ video{width:100%;height:auto;aspect-ratio:16/9;display:block;background:#000}
 async function initPlayer() {
     const urlParams = new URLSearchParams(window.location.search);
     const batchId = urlParams.get('batchId');
-    const subjectId = urlParams.get('subjectId');
     const childId = urlParams.get('childId');
 
-    if (!batchId || !subjectId || !childId) {
+    if (!batchId || !childId) {
         document.getElementById('loader').style.display = 'none';
         document.getElementById('errorMsg').style.display = 'block';
-        document.getElementById('errorMsg').innerText = 'Missing required URL parameters (batchId, subjectId, childId)';
+        document.getElementById('errorMsg').innerText = 'Missing required URL parameters (batchId, childId)';
         return;
     }
 
     try {
-        const mediaRes = await fetch(`/api/video?batchId=${batchId}&subjectId=${subjectId}&childId=${childId}`);
+        const mediaRes = await fetch(`/api/video?batchId=${batchId}&childId=${childId}`);
         const mediaJson = await mediaRes.json();
         
         if (!mediaJson.success || !mediaJson.data) {
