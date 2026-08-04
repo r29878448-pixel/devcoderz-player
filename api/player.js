@@ -1,26 +1,30 @@
 export default async function handler(req, res) {
-    const targetUrl = req.query.url;
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', '*');
 
-    if (!targetUrl) {
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        return res.status(400).json({ error: 'URL parameter is required' });
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+
+    const { get_hls, quality, mpd } = req.query;
+
+    if (!mpd) {
+        return res.status(400).json({ error: 'Missing mpd parameter' });
     }
 
     try {
-        const scrapeDoToken = '11c63f21b40043bbbe24ee1c179b1b3ede58155df6a';
-        const scrapeUrl = `https://api.scrape.do?token=${scrapeDoToken}&url=${encodeURIComponent(targetUrl)}`;
+        let targetUrl = `https://studyuk.online/newproxy/proxy2.php?get_hls=${get_hls || '1'}&quality=${quality || '480'}&mpd=${encodeURIComponent(mpd)}`;
+        const response = await fetch(targetUrl);
+        
+        const contentType = response.headers.get('content-type');
+        if (contentType) {
+            res.setHeader('Content-Type', contentType);
+        }
 
-        const response = await fetch(scrapeUrl);
-
-        const contentType = response.headers.get('content-type') || 'application/octet-stream';
         const buffer = await response.arrayBuffer();
-
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Content-Type', contentType);
         return res.status(response.status).send(Buffer.from(buffer));
-
-    } catch (err) {
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        return res.status(500).json({ error: err.message });
+    } catch (error) {
+        return res.status(500).json({ error: 'Failed to fetch proxy' });
     }
 }
