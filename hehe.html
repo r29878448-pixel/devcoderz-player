@@ -16,9 +16,6 @@ video{width:100%;height:auto;aspect-ratio:16/9;display:block;background:#000}
 @keyframes spin{to{transform:rotate(360deg)}}
 .loader-text{margin-top:12px;font-size:14px;font-weight:600;color:#ddd}
 .error-msg{padding:20px;text-align:center;color:#ff6b6b;font-size:14px;font-weight:600;display:none}
-.status-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(0,0,0,0.8);padding:6px 12px;font-size:11px;color:#888;text-align:center;z-index:999;font-family:monospace;border-top:1px solid #222}
-.status-bar .sw-status{color:#4CAF50}
-.status-bar .sw-status.fail{color:#ff6b6b}
 </style>
 </head>
 <body>
@@ -26,307 +23,73 @@ video{width:100%;height:auto;aspect-ratio:16/9;display:block;background:#000}
 <div class="player-container">
     <div id="loader" class="loader-overlay">
         <div class="spinner"></div>
-        <div class="loader-text" id="loaderText">Loading Secure Stream...</div>
+        <div class="loader-text">Loading Secure Stream...</div>
     </div>
     <div id="errorMsg" class="error-msg">Failed to load video stream. Please check parameters or connection.</div>
     <video id="videoPlayer" controls playsinline></video>
 </div>
 
-<!-- Status Bar -->
-<div class="status-bar">
-    <span>🔒 CORS: <span id="corsStatus" class="sw-status">Initializing...</span></span>
-    <span style="margin:0 12px">|</span>
-    <span>📡 <span id="segmentStatus">Waiting...</span></span>
-</div>
-
 <script>
-// ─── CONFIGURATION ───
-const CONFIG = {
-    // Set to true if you want to force proxy mode (fallback)
-    FORCE_PROXY: false,
-    // Quality settings
-    QUALITY: '480',
-    // Debug mode
-    DEBUG: true
-};
-
-// ─── LOGGING ───
-function log(...args) {
-    if (CONFIG.DEBUG) console.log('[Player]', ...args);
-}
-
-function logError(...args) {
-    console.error('[Player Error]', ...args);
-}
-
-// ─── STATUS UPDATES ───
-function updateStatus(elementId, text, isSuccess = true) {
-    const el = document.getElementById(elementId);
-    if (el) {
-        el.textContent = text;
-        el.className = isSuccess ? 'sw-status' : 'sw-status fail';
-    }
-}
-
-// ─── SERVICE WORKER REGISTRATION ───
-async function registerServiceWorker() {
-    if (!('serviceWorker' in navigator)) {
-        updateStatus('corsStatus', 'Not Supported', false);
-        log('Service Worker not supported');
-        return false;
-    }
-
-    try {
-        const registration = await navigator.serviceWorker.register('/sw.js', { 
-            scope: '/' 
-        });
-        
-        log('Service Worker registered successfully:', registration);
-        updateStatus('corsStatus', '✅ Active (CORS Handler)', true);
-        
-        // Check if SW is active
-        if (registration.active) {
-            log('Service Worker is active');
-        } else {
-            log('Service Worker is installing/activating...');
-        }
-        
-        // Send a message to the service worker to confirm communication
-        if (registration.active) {
-            registration.active.postMessage({ type: 'PING' });
-        }
-        
-        return true;
-    } catch (err) {
-        logError('Service Worker registration failed:', err);
-        updateStatus('corsStatus', '❌ Failed (Using Proxy Fallback)', false);
-        return false;
-    }
-}
-
-// ─── HLS LOADER WITH CORS SUPPORT ───
-function createHLSPlayer(video, proxyUrl, loaderElement) {
-    return new Promise((resolve, reject) => {
-        if (!window.Hls || !window.Hls.isSupported()) {
-            reject(new Error('HLS not supported'));
-            return;
-        }
-
-        const hls = new Hls({
-            // Enable CORS mode
-            xhrSetup: function(xhr, url) {
-                xhr.withCredentials = false;
-                // Add custom headers if needed
-                xhr.setRequestHeader('Origin', window.location.origin);
-            },
-            // Custom loader for better CORS handling
-            loader: function(config) {
-                const defaultLoader = new Hls.DefaultLoader(config);
-                const originalLoad = defaultLoader.load.bind(defaultLoader);
-
-                defaultLoader.load = function(context, config, callbacks) {
-                    // Log segment loading
-                    if (context.url && context.url.includes('.ts')) {
-                        updateStatus('segmentStatus', `Loading: ${context.url.split('/').pop().slice(0, 20)}...`, true);
-                    }
-                    
-                    // For segments, try direct fetch first (Service Worker will handle CORS)
-                    originalLoad(context, config, {
-                        onSuccess: callbacks.onSuccess,
-                        onError: (error, context, config) => {
-                            // If Service Worker fails, try proxy fallback
-                            if (CONFIG.FORCE_PROXY || error.status === 0) {
-                                log('CORS error detected, using proxy fallback for:', context.url);
-                                // Try proxy for this segment
-                                const proxySegUrl = `/api/proxy2?get_segment=1&ts=${encodeURIComponent(context.url)}`;
-                                const fallbackContext = Object.assign({}, context, { url: proxySegUrl });
-                                originalLoad(fallbackContext, config, {
-                                    onSuccess: callbacks.onSuccess,
-                                    onError: (err, ctx, cfg) => {
-                                        logError('Proxy fallback failed:', err);
-                                        callbacks.onError(err, ctx, cfg);
-                                    }
-                                });
-                            } else {
-                                callbacks.onError(error, context, config);
-                            }
-                        }
-                    });
-                };
-
-                return defaultLoader;
-            }
-        });
-
-        // HLS Event Handlers
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            log('Manifest parsed successfully');
-            loaderElement.classList.add('hidden');
-            updateStatus('segmentStatus', '✅ Ready', true);
-            resolve(hls);
-        });
-
-        hls.on(Hls.Events.LEVEL_LOADED, (event, data) => {
-            log('Level loaded:', data.level);
-        });
-
-        hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
-            updateStatus('segmentStatus', `📦 ${data.frag.sn}/${data.frag.duration}s`, true);
-        });
-
-        hls.on(Hls.Events.ERROR, (event, data) => {
-            if (data.fatal) {
-                logError('Fatal HLS error:', data);
-                loaderElement.classList.add('hidden');
-                updateStatus('segmentStatus', '❌ Error', false);
-                reject(data);
-            } else {
-                log('HLS non-fatal error:', data.type);
-            }
-        });
-
-        // Load the source
-        try {
-            log('Loading source:', proxyUrl);
-            hls.loadSource(proxyUrl);
-            hls.attachMedia(video);
-        } catch (err) {
-            logError('Failed to load source:', err);
-            reject(err);
-        }
-    });
-}
-
-// ─── MAIN PLAYER INIT ───
 async function initPlayer() {
     const urlParams = new URLSearchParams(window.location.search);
     const batchId = urlParams.get('batchId');
     const childId = urlParams.get('childId');
-    const quality = urlParams.get('quality') || CONFIG.QUALITY;
-
-    const loader = document.getElementById('loader');
-    const loaderText = document.getElementById('loaderText');
-    const video = document.getElementById('videoPlayer');
-    const errorMsg = document.getElementById('errorMsg');
 
     if (!batchId || !childId) {
-        loader.style.display = 'none';
-        errorMsg.style.display = 'block';
-        errorMsg.innerText = 'Missing required URL parameters (batchId, childId)';
-        logError('Missing parameters');
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('errorMsg').style.display = 'block';
+        document.getElementById('errorMsg').innerText = 'Missing required URL parameters (batchId, childId)';
         return;
     }
 
-    log(`Initializing player with batchId: ${batchId}, childId: ${childId}, quality: ${quality}`);
-
     try {
-        // 1. Register Service Worker
-        loaderText.textContent = 'Registering Service Worker...';
-        const swRegistered = await registerServiceWorker();
-        
-        if (!swRegistered) {
-            loaderText.textContent = '⚠️ Service Worker unavailable, using fallback...';
-            updateStatus('corsStatus', '⚠️ Fallback Mode', false);
-        }
-
-        // 2. Fetch media URL
-        loaderText.textContent = 'Fetching video stream...';
-        log('Fetching media URL...');
-        
-        const mediaRes = await fetch(`/api/video?batchId=${batchId}&childId=${childId}`);
-        
-        if (!mediaRes.ok) {
-            throw new Error(`API returned ${mediaRes.status}: ${mediaRes.statusText}`);
-        }
-        
+        const mediaRes = await fetch(/api/video?batchId=${batchId}&childId=${childId});
         const mediaJson = await mediaRes.json();
 
         if (!mediaJson.success || !mediaJson.data) {
-            throw new Error('Invalid media API response: ' + JSON.stringify(mediaJson));
+            throw new Error('Invalid media API response');
         }
-
-        log('Media API response received');
 
         const rawUrl = mediaJson.data.url;
         const signed = mediaJson.data.signedUrl;
         const fullMpd = rawUrl + signed;
 
-        log('Full MPD URL:', fullMpd.substring(0, 100) + '...');
+        const proxyUrl = /api/player?get_hls=1&quality=480&mpd=${encodeURIComponent(fullMpd)};
+        const video = document.getElementById('videoPlayer');
+        const loader = document.getElementById('loader');
 
-        // 3. Build proxy URL
-        const proxyUrl = `/api/player?get_hls=1&quality=${quality}&mpd=${encodeURIComponent(fullMpd)}`;
-        log('Proxy URL:', proxyUrl);
-
-        // 4. Initialize HLS
-        loaderText.textContent = 'Loading stream...';
-        
-        const hls = await createHLSPlayer(video, proxyUrl, loader);
-        
-        log('Player initialized successfully');
-        
-        // Store HLS instance for cleanup
-        window.hlsInstance = hls;
-
+        if (window.Hls && window.Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(proxyUrl);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                loader.classList.add('hidden');
+                video.play().catch(() => {});
+            });
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                if (data.fatal) {
+                    loader.classList.add('hidden');
+                    document.getElementById('errorMsg').style.display = 'block';
+                }
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = proxyUrl;
+            video.addEventListener('loadedmetadata', () => {
+                loader.classList.add('hidden');
+                video.play().catch(() => {});
+            });
+        } else {
+            loader.classList.add('hidden');
+            document.getElementById('errorMsg').style.display = 'block';
+        }
     } catch (err) {
-        logError('Player initialization failed:', err);
-        loader.classList.add('hidden');
-        errorMsg.style.display = 'block';
-        errorMsg.innerText = `Error: ${err.message || 'Unknown error'}`;
-        updateStatus('segmentStatus', '❌ Failed', false);
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('errorMsg').style.display = 'block';
     }
 }
 
-// ─── CLEANUP ───
-function cleanup() {
-    if (window.hlsInstance) {
-        window.hlsInstance.destroy();
-        window.hlsInstance = null;
-        log('HLS instance destroyed');
-    }
-}
-
-// ─── HANDLE PAGE UNLOAD ───
-window.addEventListener('beforeunload', cleanup);
-
-// ─── START PLAYER ───
-// Wait for DOM to be ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initPlayer);
-} else {
-    initPlayer();
-}
-
-// ─── RECEIVE MESSAGES FROM SERVICE WORKER ───
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('message', (event) => {
-        const data = event.data;
-        if (data && data.type === 'STATUS') {
-            log('Service Worker status:', data.message);
-            if (data.message.includes('CORS')) {
-                updateStatus('corsStatus', '✅ ' + data.message, true);
-            }
-        }
-        if (data && data.type === 'SEGMENT_LOADED') {
-            updateStatus('segmentStatus', `📦 ${data.segment} loaded`, true);
-        }
-    });
-}
-
-// ─── RECOVERY FROM ERRORS ───
-setTimeout(() => {
-    // If loader is still visible after 30 seconds, show error
-    const loader = document.getElementById('loader');
-    const errorMsg = document.getElementById('errorMsg');
-    if (!loader.classList.contains('hidden')) {
-        loader.classList.add('hidden');
-        errorMsg.style.display = 'block';
-        errorMsg.innerText = 'Loading timeout. Please check your connection and try again.';
-        updateStatus('segmentStatus', '⏱️ Timeout', false);
-    }
-}, 30000);
-
-log('Player script loaded successfully');
+initPlayer();
 </script>
 
-</body> 
+</body>
 </html>
