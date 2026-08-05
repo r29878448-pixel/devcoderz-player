@@ -43,7 +43,7 @@ async function initPlayer() {
     }
 
     try {
-        const mediaRes = await fetch(/api/video?batchId=${batchId}&childId=${childId});
+        const mediaRes = await fetch(`/api/video?batchId=${batchId}&childId=${childId}`);
         const mediaJson = await mediaRes.json();
 
         if (!mediaJson.success || !mediaJson.data) {
@@ -54,7 +54,7 @@ async function initPlayer() {
         const signed = mediaJson.data.signedUrl;
         const fullMpd = rawUrl + signed;
 
-        const proxyUrl = /api/player?get_hls=1&quality=480&mpd=${encodeURIComponent(fullMpd)};
+        const proxyUrl = `/api/player?get_hls=1&quality=480&mpd=${encodeURIComponent(fullMpd)}`;
         const video = document.getElementById('videoPlayer');
         const loader = document.getElementById('loader');
 
